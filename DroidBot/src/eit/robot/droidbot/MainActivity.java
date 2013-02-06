@@ -1,5 +1,7 @@
 package eit.robot.droidbot;
 
+import java.io.IOException;
+
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.app.Activity;
@@ -7,7 +9,9 @@ import android.view.Menu;
 import android.widget.TextView;
 
 public class MainActivity extends Activity {
-
+	private BotServer _server;
+	
+	
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -31,7 +35,20 @@ public class MainActivity extends Activity {
     	TextView l = (TextView)findViewById(R.id.bolle);
     	final String formatedIpAddress = String.format("%d.%d.%d.%d", (ipAddress & 0xff), (ipAddress >> 8 & 0xff),
     	        (ipAddress >> 16 & 0xff), (ipAddress >> 24 & 0xff));
-    	l.setText(formatedIpAddress);
+    	l.setText(formatedIpAddress + "v2");
+    	try {
+    		_server = new BotServer();
+    	} catch(IOException e) {
+    		e.printStackTrace();
+    	}
+    }
+    
+    @Override
+    protected void onPause() {
+    	super.onPause();
+    	
+    	if(_server != null)
+    		_server.stop();
     }
     
 }
