@@ -1,8 +1,10 @@
 package eit.robot.droidbot;
 
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.app.Activity;
 import android.view.Menu;
+import android.widget.TextView;
 
 public class MainActivity extends Activity {
 
@@ -18,6 +20,18 @@ public class MainActivity extends Activity {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.activity_main, menu);
         return true;
+    }
+    
+    @Override
+    protected void onResume() {
+    	super.onResume();
+    	
+    	WifiManager wifiManager = (WifiManager) getSystemService(WIFI_SERVICE);
+    	int ipAddress = wifiManager.getConnectionInfo().getIpAddress();
+    	TextView l = (TextView)findViewById(R.id.bolle);
+    	final String formatedIpAddress = String.format("%d.%d.%d.%d", (ipAddress & 0xff), (ipAddress >> 8 & 0xff),
+    	        (ipAddress >> 16 & 0xff), (ipAddress >> 24 & 0xff));
+    	l.setText(formatedIpAddress);
     }
     
 }
