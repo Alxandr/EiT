@@ -1,3 +1,0 @@
-[submodule "lib/nanohttpd"]
-	path = lib/nanohttpd
-	url = git://github.com/elonen/nanohttpd.git
