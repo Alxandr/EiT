@@ -30,4 +30,11 @@
 		<nature>com.android.ide.eclipse.adt.AndroidNature</nature>
 		<nature>org.eclipse.jdt.core.javanature</nature>
 	</natures>
+	<linkedResources>
+		<link>
+			<name>src/NanoHTTPD.java</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/lib/nanohttpd/NanoHTTPD.java</locationURI>
+		</link>
+	</linkedResources>
 </projectDescription>
