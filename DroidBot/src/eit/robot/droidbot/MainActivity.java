@@ -6,10 +6,11 @@ import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.app.Activity;
 import android.view.Menu;
+import android.view.WindowManager;
 import android.widget.TextView;
 
-public class MainActivity extends Activity {
-	private BotServer _server;
+public class MainActivity extends Activity implements BotHandler {
+	private TextView _txt;
 	
 	
     @Override
@@ -30,15 +31,17 @@ public class MainActivity extends Activity {
     protected void onResume() {
     	super.onResume();
     	
+    	getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    	
     	WifiManager wifiManager = (WifiManager) getSystemService(WIFI_SERVICE);
     	int ipAddress = wifiManager.getConnectionInfo().getIpAddress();
-    	TextView l = (TextView)findViewById(R.id.bolle);
+    	_txt = (TextView)findViewById(R.id.bolle);
     	final String formatedIpAddress = String.format("%d.%d.%d.%d", (ipAddress & 0xff), (ipAddress >> 8 & 0xff),
     	        (ipAddress >> 16 & 0xff), (ipAddress >> 24 & 0xff));
-    	l.setText(formatedIpAddress + "v2");
+    	setText(formatedIpAddress + "v2");
     	try {
-    		_server = new BotServer();
-    	} catch(IOException e) {
+    		// TODO: Init server
+    	} catch(/*IO*/Exception e) {
     		e.printStackTrace();
     	}
     }
@@ -47,8 +50,13 @@ public class MainActivity extends Activity {
     protected void onPause() {
     	super.onPause();
     	
-    	if(_server != null)
-    		_server.stop();
+    	// TODO: Stop server
     }
+
+	@Override
+	public void setText(String text) {
+		// TODO Auto-generated method stub
+		_txt.setText(text);
+	}
     
 }
