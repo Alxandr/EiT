@@ -1,0 +1,12 @@
+package me.alxandr.Transport;
+
+option optimize_for = LITE_RUNTIME;
+option java_package = "me.alxandr.Transport";
+option java_outer_classname = "Robot";
+
+// ./protoc -I="/Users/alxandr/EiT/protobuffs/" --java_out="/Users/alxandr/EiT/Transport/src/" /Users/alxandr/EiT/protobuffs/Test.proto
+
+message EngineSpeed {
+  required float x = 1;
+  required float y = 2;
+}

@@ -2,7 +2,7 @@
 <resources>
 
     <string name="app_name">DroidBot</string>
-    <string name="hello_world">Hello world!</string>
+    <string name="hello_world">Hello bot!</string>
     <string name="menu_settings">Settings</string>
 
 </resources>
