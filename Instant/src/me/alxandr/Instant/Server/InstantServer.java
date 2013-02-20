@@ -190,13 +190,12 @@ public abstract class InstantServer {
 		
 		final SocketChannel channel = socketChannel;
 		_readBuffer.position(0);
-		final byte[] data = new byte[_readBuffer.limit()];
+		final byte[] data = new byte[numRead];
 		_readBuffer.get(data, 0, data.length);
-		final int length = numRead;
 		_executor.execute(new Runnable() {
 			@Override
 			public void run() {
-				processData(channel, data, length);
+				processData(channel, data);
 			}
 		});
 	}
@@ -211,7 +210,7 @@ public abstract class InstantServer {
 		});
 	}
 
-	protected abstract void processData(SocketChannel socketChannel, byte[] array, int length);
+	protected abstract void processData(SocketChannel socketChannel, byte[] array);
 	protected abstract void clientConnected(SocketChannel socketChannel);
 	protected abstract void clientDisconnected(SocketChannel socketChannel);
 }

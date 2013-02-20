@@ -52,14 +52,14 @@ public abstract class MessageServer extends InstantServer {
 	}
 	
 	@Override
-	protected final void processData (SocketChannel socketChannel, byte[] array, int length)
+	protected final void processData (SocketChannel socketChannel, byte[] array)
 	{
 		MessageClient client;
 		synchronized(_clients) {
 			client = _clients.get(socketChannel);
 		}
 		
-		client.append(array, 0, length);
+		client.append(array, 0, array.length);
 		
 		byte[] msg;
 		while((msg = client.message ()) != null) {

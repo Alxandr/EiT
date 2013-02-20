@@ -4,6 +4,7 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 import java.util.UUID;
 
 import me.alxandr.Instant.Server.MessageServer;
@@ -51,7 +52,12 @@ public class Program {
 		server.start();
 		System.out.println("Listening");
 		
-		
+		try {
+			Thread.sleep(1000000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 }
