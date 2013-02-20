@@ -2,6 +2,7 @@ package me.alxandr.Instant.Server;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
@@ -9,13 +10,13 @@ import java.util.UUID;
 
 public abstract class MessageServer extends InstantServer {
 
-	final HashMap<SocketChannel, MessageClient> _clients;
+	final HashMap<Socket, MessageClient> _clients;
 	final HashMap<UUID, MessageClient> _clientIds;
 	
 	public MessageServer(InetAddress hostAddress, int port) throws IOException {
 		super(hostAddress, port);
 		// TODO Auto-generated constructor stub
-		_clients = new HashMap<SocketChannel, MessageClient>();
+		_clients = new HashMap<Socket, MessageClient>();
 		_clientIds = new HashMap<UUID, MessageServer.MessageClient>();
 	}
 	
@@ -29,7 +30,7 @@ public abstract class MessageServer extends InstantServer {
 	}
 
 	@Override
-	protected final void clientConnected(SocketChannel socketChannel)
+	protected final void clientConnected(Socket socketChannel)
 	{
 		MessageClient client = new MessageClient (socketChannel);
 		synchronized(_clients) {
@@ -40,7 +41,7 @@ public abstract class MessageServer extends InstantServer {
 	}
 	
 	@Override
-	protected final void clientDisconnected (SocketChannel socketChannel)
+	protected final void clientDisconnected (Socket socketChannel)
 	{
 		MessageClient client;
 		synchronized (_clients) {
@@ -52,14 +53,14 @@ public abstract class MessageServer extends InstantServer {
 	}
 	
 	@Override
-	protected final void processData (SocketChannel socketChannel, byte[] array)
+	protected final void processData (Socket socketChannel, byte[] array, int length)
 	{
 		MessageClient client;
 		synchronized(_clients) {
 			client = _clients.get(socketChannel);
 		}
 		
-		client.append(array, 0, array.length);
+		client.append(array, 0, length);
 		
 		byte[] msg;
 		while((msg = client.message ()) != null) {
@@ -74,11 +75,11 @@ public abstract class MessageServer extends InstantServer {
 	private class MessageClient
 	{
 		private final ByteBuffer _buffer = ByteBuffer.allocate(4096);
-		private final SocketChannel _channel;
+		private final Socket _channel;
 		private final UUID _id;
 		private int _length;
 		
-		public MessageClient (SocketChannel socketChannel) {
+		public MessageClient (Socket socketChannel) {
 			_channel = socketChannel;
 			_id = UUID.randomUUID ();
 			_length = 0;
@@ -88,7 +89,7 @@ public abstract class MessageServer extends InstantServer {
 			return _id;
 		}
 		
-		public SocketChannel channel () {
+		public Socket channel () {
 			return _channel;
 		}
 

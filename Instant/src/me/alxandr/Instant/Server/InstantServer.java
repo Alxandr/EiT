@@ -1,216 +1,166 @@
 package me.alxandr.Instant.Server;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeoutException;
 
 public abstract class InstantServer {
 	// The host:port combination to listen on
 	private InetAddress _hostAddress;
 	private int _port;
 	
-	// The channel on which we'll accept connections
-	private ServerSocketChannel _serverChannel;
-	
-	// The selector we'll be monitoring
-	private Selector _selector;
-	private Iterator _selectedKeys;
-	
-	// Incomming buffer
-	private ByteBuffer _readBuffer = ByteBuffer.allocate(8192);
-	
 	private volatile boolean _running = false;
 	
-	private Thread _runner;
+	private Thread _listener;
 	private ExecutorService _executor;
 	
-	public InstantServer(InetAddress hostAddress, int port) throws IOException
-	{
-		_hostAddress = hostAddress;
+	private ServerSocket _serverSocket = null;
+	
+	private HashMap<Socket, DataOutputStream> _outStreams;
+	
+	public InstantServer(InetAddress address, int port) {
 		_port = port;
-		_selector = initSelector();
-	}
-	
-	private Selector initSelector() throws IOException
-	{
-		// Create a new selector
-		Selector socketSelector = SelectorProvider.provider().openSelector();
-		
-		// Create a new non-blocking server socket channel
-		_serverChannel = ServerSocketChannel.open();
-		_serverChannel.configureBlocking(false);
-		
-		// Bind the socket to the specified address and port
-		InetSocketAddress isa = new InetSocketAddress(_hostAddress, _port);
-		_serverChannel.socket().bind(isa);
-		
-		// Register the server socket channel, indicating an interest in
-		// accepting new connections
-		_serverChannel.register(socketSelector, SelectionKey.OP_ACCEPT);
-		
-		return socketSelector;
-	}
-	
-	public final synchronized void start () {
-		if(_running)
-			throw new IllegalStateException("Already accepting");
-		_running = true;
-		
+		_hostAddress = address;
+		_outStreams = new HashMap<Socket, DataOutputStream>();
 		_executor = Executors.newCachedThreadPool(new ThreadFactory() {
 			@Override
-			public Thread newThread(Runnable arg0) {
-				Thread t = new Thread(arg0);
+			public Thread newThread(Runnable r) {
+				Thread t = new Thread(r);
 				t.setDaemon(true);
 				return t;
 			}
 		});
-		_runner = new Thread() {
-			@Override
-			public void run() {
-				bgThread();
-			}
-		};
-		_runner.setDaemon(true);
-		_runner.start();
 	}
 	
-	private void bgThread () {
-		try {
-			while(_running) {
-				if(_selectedKeys != null) {
-					while(_selectedKeys.hasNext()) {
-						SelectionKey key = (SelectionKey)_selectedKeys.next();
-						_selectedKeys.remove();
-						
-						if(!key.isValid()) {
-							continue;
+	public synchronized void open() throws IOException {
+		if(_running)
+			throw new IllegalStateException("Already opened");
+		
+		_running = true;
+		
+		_serverSocket = new ServerSocket(10007, 5, _hostAddress);
+		_listener = new Thread() {
+			@Override
+			public void run() {
+				while(_running) {
+					try {
+						_serverSocket.setSoTimeout(1000);
+						try {
+							Socket socket = _serverSocket.accept();
+							onClientConnected(socket);
+						} catch (SocketTimeoutException te) {
+							
 						}
-						
-						if(key.isAcceptable()) {
-							accept(key);
-						} else if(key.isReadable()) {
-							read(key);
-						}
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
 					}
 				}
-				if(_selector.select(1000) > 0) {
-					_selectedKeys = _selector.selectedKeys().iterator();
+			}
+		};
+		_listener.setDaemon(true);
+		_listener.start();
+	}
+	
+	private final void onClientConnected(final Socket socket) throws IOException {
+		final DataInputStream iStream = new DataInputStream(socket.getInputStream());
+		final DataOutputStream oStream = new DataOutputStream(socket.getOutputStream());
+		
+		synchronized(_outStreams) {
+			_outStreams.put(socket, oStream);
+		}
+		
+		Thread reader = new Thread() {
+			@Override
+			public void run() {
+				while(_running) {
+					try {
+						socket.setSoTimeout(1000);
+						try {
+							if(iStream.available() > 0) {
+								byte[] buffer = new byte[4096];
+								int length = iStream.read(buffer);
+								if(length == -1) {
+									// Remote end shut down clean
+									onClientDisconnect(socket);
+									return;
+								} else {
+									onProcessData(socket, buffer, length);
+								}
+							} else {
+								try {
+									Thread.sleep(200);
+								} catch (InterruptedException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								}
+							}
+						} catch (SocketTimeoutException te) {
+							
+						}
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 				}
 			}
-		} catch(IOException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	public final synchronized void send(SocketChannel channel, byte[] data) throws IOException
-	{
-		send(channel, ByteBuffer.wrap(data.clone()));
-	}
-	
-	public final synchronized void send(SocketChannel channel, ByteBuffer buffer) throws IOException
-	{
-		channel.write(buffer);
-	}
-	
-	public final synchronized void stop()
-	{
-		if(!_running)
-			throw new IllegalStateException("Not accepting");
-		
-		_running = false;
-		try {
-			_runner.join();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		_runner = null;
-		_executor.shutdown();
-		_executor = null;
-	}
-	
-	private final void accept(SelectionKey key) throws IOException {
-		ServerSocketChannel serverSocketChannel = (ServerSocketChannel) key.channel();
-		
-		// Accept the connection and make it non-blocking
-		final SocketChannel channel = serverSocketChannel.accept();
-		Socket socket = channel.socket();
-		channel.configureBlocking(false);
-		
-		// Register the new SocketChannel with our Selector, indicating
-		// we'd like to be notified when there's data waiting to be read
-		channel.register(_selector, SelectionKey.OP_READ);
+		};
+		reader.setDaemon(true);
+		reader.start();
 		_executor.execute(new Runnable() {
 			@Override
 			public void run() {
-				clientConnected(channel);
+				clientConnected(socket);
 			}
 		});
 	}
 	
-	private final void read(SelectionKey key) throws IOException {
-		SocketChannel socketChannel = (SocketChannel) key.channel();
-		
-		// Clear out our read buffer so it's ready for new data
-		_readBuffer.clear();
-		
-		// Attempt to read off the channel
-		int numRead;
-		try {
-	      numRead = socketChannel.read(_readBuffer);
-	    } catch (IOException e) {
-	      // The remote forcibly closed the connection, cancel
-	      // the selection key and close the channel.
-	      key.cancel();
-	      socketChannel.close();
-	      onClientDisconnect(socketChannel);
-	      return;
-	    }
-		
-		if (numRead == -1) {
-	      // Remote entity shut the socket down cleanly. Do the
-	      // same from our end and cancel the channel.
-	      key.channel().close();
-	      key.cancel();
-	      onClientDisconnect(socketChannel);
-	      return;
-	    }
-		
-		final SocketChannel channel = socketChannel;
-		_readBuffer.position(0);
-		final byte[] data = new byte[numRead];
-		_readBuffer.get(data, 0, data.length);
+	public void send(Socket socket, ByteBuffer buffer) throws IOException {
+		synchronized(_outStreams) {
+			DataOutputStream oStream = _outStreams.get(socket);
+			oStream.write(buffer.array(), buffer.arrayOffset(), buffer.limit());
+		}
+	}
+	
+	private final void onClientDisconnect(final Socket socket) {
 		_executor.execute(new Runnable() {
 			@Override
 			public void run() {
-				processData(channel, data);
+				clientDisconnected(socket);
 			}
 		});
 	}
 	
-	private final void onClientDisconnect(final SocketChannel channel)
-	{
+	private final void onProcessData(final Socket socket, final byte[] array, final int length) {
 		_executor.execute(new Runnable() {
 			@Override
 			public void run() {
-				clientDisconnected(channel);
+				processData(socket, array, length);
 			}
 		});
 	}
 
-	protected abstract void processData(SocketChannel socketChannel, byte[] array);
-	protected abstract void clientConnected(SocketChannel socketChannel);
-	protected abstract void clientDisconnected(SocketChannel socketChannel);
+	protected abstract void processData(Socket socketChannel, byte[] array, int length);
+	protected abstract void clientConnected(Socket socketChannel);
+	protected abstract void clientDisconnected(Socket socketChannel);
 }

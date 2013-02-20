@@ -1,8 +1,13 @@
 package me.alxandr.Instant.Client;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -19,155 +24,75 @@ public abstract class InstantClient {
 	private InetAddress _hostAddress;
 	private int _port;
 	
-	// The channel on which we'll accept connections
-	private ServerSocketChannel _serverChannel;
-	
-	// The selector we'll be monitoring
-	private Selector _selector;
-	private Iterator _selectedKeys;
-	
-	// Incomming buffer
-	private ByteBuffer _readBuffer = ByteBuffer.allocate(8192);
-	
 	private volatile boolean _running = false;
 	
-	private Thread _runner;
+	private Thread _listener;
 	private ExecutorService _executor;
 	
-	public InstantClient (InetAddress hostAddress, int port) throws IOException
-	{
-		_hostAddress = hostAddress;
-		_port = port;
-		_selector = initSelector();
-	}
+	private Socket _socket = null;
+	private DataOutputStream _oStream;
 	
-	public void connect () throws IOException {
-		if(_running)
-			throw new IllegalStateException("Already accepting");
-		_running = true;
-		
-		SocketChannel socketChannel = SocketChannel.open ();
-		socketChannel.configureBlocking (false);
-		
-		socketChannel.connect (new InetSocketAddress (_hostAddress, _port));
-		socketChannel.register (_selector, SelectionKey.OP_CONNECT);
-		
+	public InstantClient(InetAddress address, int port) {
+		_hostAddress = address;
+		_port = port;
 		_executor = Executors.newCachedThreadPool(new ThreadFactory() {
 			@Override
-			public Thread newThread(Runnable arg0) {
-				Thread t = new Thread(arg0);
+			public Thread newThread(Runnable r) {
+				Thread t = new Thread(r);
 				t.setDaemon(true);
 				return t;
 			}
 		});
-		_runner = new Thread() {
+	}
+	
+	public void connect() throws IOException {
+		_socket = new Socket(_hostAddress, _port);
+		final DataInputStream iStream = new DataInputStream(_socket.getInputStream());
+		_oStream = new DataOutputStream(_socket.getOutputStream());
+		_running = true;
+		
+		Thread reader = new Thread() {
 			@Override
 			public void run() {
-				bgThread();
-			}
-		};
-		_runner.setDaemon(true);
-		_runner.start();
-	}
-	
-	public void disconnect () throws IOException {
-		if(!_running)
-			throw new IllegalStateException("Not accepting");
-		
-		_running = false;
-		try {
-			_runner.join();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		_runner = null;
-		_executor.shutdown();
-		_executor = null;
-	}
-	
-	private Selector initSelector () throws IOException {
-		// Create a new selector
-		return SelectorProvider.provider().openSelector();
-	}
-	
-	private void bgThread () {
-		try {
-			while (_running) {
-				if (_selectedKeys != null) {
-					while (_selectedKeys.hasNext()) {
-						SelectionKey key = (SelectionKey)_selectedKeys.next();
-						_selectedKeys.remove();
-						
-						if (!key.isValid ()) {
-							continue;
+				while(_running) {
+					try {
+						_socket.setSoTimeout(1000);
+						try {
+							if(iStream.available() > 0) {
+								byte[] buffer = new byte[4096];
+								int length = iStream.read(buffer);
+								if(length == -1) {
+									// Remote end shut down clean
+									onDisconnect();
+									return;
+								} else {
+									onProcessData(buffer, length);
+								}
+							} else {
+								try {
+									Thread.sleep(200);
+								} catch (InterruptedException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								}
+							}
+						} catch (SocketTimeoutException te) {
+							
 						}
-						
-						if (key.isConnectable ()) {
-							connect(key);
-						} else if (key.isReadable ()) {
-							read(key);
-						}
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
 					}
 				}
-				if(_selector.select (1000) > 0) {
-					_selectedKeys = _selector.selectedKeys ().iterator ();
-				}
 			}
-		} catch(IOException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	private final void connect(SelectionKey key) throws IOException {
-		SocketChannel socketChannel = (SocketChannel) key.channel();
-		
-		// Finish the connection. If the connection operation failed
-		// this will raise an IOException.
-		try {
-			socketChannel.finishConnect();
-		} catch (IOException e) {
-			// Cancel the channel's registration with our selector
-			System.out.println(e);
-			key.cancel();
-			return;
-		}
-		
-		key.interestOps(SelectionKey.OP_READ);
+		};
+		reader.setDaemon(true);
 		onConnect();
+		reader.start();
 	}
 	
-	private final void read(SelectionKey key) throws IOException {
-		SocketChannel socketChannel = (SocketChannel) key.channel();
-		
-		// Clear out our read buffer so it's ready for new data
-		_readBuffer.clear();
-		
-		// Attempt to read off the channel
-		int numRead;
-		try {
-	      numRead = socketChannel.read(_readBuffer);
-	    } catch (IOException e) {
-	      // The remote forcibly closed the connection, cancel
-	      // the selection key and close the channel.
-	      key.cancel();
-	      socketChannel.close();
-	      onDisconnect();
-	      return;
-	    }
-		
-		if (numRead == -1) {
-	      // Remote entity shut the socket down cleanly. Do the
-	      // same from our end and cancel the channel.
-	      key.channel().close();
-	      key.cancel();
-	      onDisconnect();
-	      return;
-	    }
-		
-		byte[] data = new byte[numRead];
-		_readBuffer.get(data, 0, numRead);
-		onProcessData(data);
+	public void send(ByteBuffer buffer) throws IOException {
+		_oStream.write(buffer.array(), buffer.arrayOffset(), buffer.limit());
 	}
 	
 	private void onConnect () {
@@ -188,16 +113,16 @@ public abstract class InstantClient {
 		});
 	}
 	
-	private void onProcessData (final byte[] data) {
+	private void onProcessData (final byte[] data, final int length) {
 		_executor.execute(new Runnable () {
 			@Override
 			public void run () {
-				processData(data);
+				processData(data, length);
 			}
 		});
 	}
 	
 	protected abstract void connected ();
 	protected abstract void disconnected ();
-	protected abstract void processData (byte[] data);
+	protected abstract void processData (byte[] data, int length);
 }
