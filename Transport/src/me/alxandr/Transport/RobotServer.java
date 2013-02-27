@@ -9,10 +9,16 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import me.alxandr.Instant.Server.MessageServer;
 
 public class RobotServer extends MessageServer {
-
-	public RobotServer() throws IOException {
+	private IRobot _robot;
+	
+	
+	public RobotServer(IRobot robot) throws IOException {
 		super(InetAddress.getByName("0.0.0.0"), 10007);
 		// TODO Auto-generated constructor stub
+		_robot = robot;
+		if(robot == null) {
+			throw new NullPointerException("robot is null");
+		}
 	}
 
 	@Override
@@ -24,7 +30,7 @@ public class RobotServer extends MessageServer {
 	@Override
 	protected void clientDisconnected(UUID clientId) {
 		// TODO Auto-generated method stub
-		
+		_robot.setEngineSpeed(0, 0);
 	}
 
 	@Override
@@ -33,8 +39,9 @@ public class RobotServer extends MessageServer {
 		
 		try {
 			Robot.EngineSpeed es = Robot.EngineSpeed.parseFrom(message);
-			
-			System.out.println("New x: " + es.getX());
+			if(es != null) {
+				_robot.setEngineSpeed(es.getX(), es.getY());
+			}
 		} catch (InvalidProtocolBufferException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
