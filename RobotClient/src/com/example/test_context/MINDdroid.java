@@ -45,13 +45,16 @@ import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import me.alxandr.Transport.IRobot;
+import me.alxandr.Transport.RobotServer;
+
 /**
  * This class is for talking to a LEGO NXT robot and controlling it
  * via bluetooth and the built in acceleration sensor.
  * The communciation to the robot is done via LCP (LEGO communication protocol), 
  * so no special software has to be installed on the robot.
  */
-public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.OnInitListener{
+public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.OnInitListener, IRobot{
 
 	public static final int UPDATE_TIME = 200;
     public static final int MENU_TOGGLE_CONNECT = Menu.FIRST;
@@ -102,6 +105,9 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
     private int swingAngleMax = 80;
     private int swingAngleMedium = 50;
     private int swingAngleLow = 30;
+    private Thread serverListener;
+    public IRobot rage;
+    public boolean isConnectedToRobo;
 
     /**
      * Asks if bluetooth was switched on during the runtime of the app. For saving 
@@ -136,7 +142,7 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
     public void onCreate(Bundle savedInstanceState) {
     	
         super.onCreate(savedInstanceState);
-
+        rage = this;
         thisActivity = this;
 //        mRobotType = this.getIntent().getIntExtra(SplashMenu.MINDDROID_ROBOT_TYPE, 
 //            R.id.robot_type_shooterbot);
@@ -241,6 +247,7 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
         myBTCommunicator.setMACAddress(mac_address);
         myBTCommunicator.start();
         updateButtonsAndMenu();
+        isConnectedToRobo = true;
     }
 
     /**
@@ -469,14 +476,14 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
                 stopAlreadySent = false;  
         	if(isCurrentlyTurning == false){
         		isCurrentlyTurning = true;
-//		    	if(up > down){
-//		    		sendBTCmessage(BTCommunicator.NO_DELAY, motorLeft, up, 0);
-//		    		sendBTCmessage(BTCommunicator.NO_DELAY, motorRight, up, 0);
-//		    	}
-//		    	else{
-//		    		sendBTCmessage(BTCommunicator.NO_DELAY, motorLeft, down*-1, 0);
-//		    		sendBTCmessage(BTCommunicator.NO_DELAY, motorRight, down*-1, 0);
-//		    	}
+		    	if(up > down){
+		    		sendBTCmessage(BTCommunicator.NO_DELAY, motorLeft, up, 0);
+		    		sendBTCmessage(BTCommunicator.NO_DELAY, motorRight, up, 0);
+		    	}
+		    	else{
+		    		sendBTCmessage(BTCommunicator.NO_DELAY, motorLeft, down*-1, 0);
+		    		sendBTCmessage(BTCommunicator.NO_DELAY, motorRight, down*-1, 0);
+		    	}
 		    	
 		    	if(right > left){
 		    		if(right > 22 && right < 35){
@@ -708,16 +715,61 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
     public void onResume() {
         super.onResume();
         try {
-        	//serverlytter
-         //   mView.registerListener();
+     
         }
         catch (IndexOutOfBoundsException ex) {
       //      showToast(R.string.sensor_initialization_failure, Toast.LENGTH_LONG);
             destroyBTCommunicator();
             finish();
         }
+
+//        if(isConnectedToRobo == true){
+//	    	if(serverListener == null){
+//	    		serverListener = new Thread() {
+//					@Override
+//					public void run() {
+//						RobotServer server;
+//						try {
+//							if(rage == null) {
+//					    		System.out.println("this is null???? 1");
+//					    	}
+//							server = new RobotServer(rage);
+//							server.open();
+//						} catch (IOException e) {
+//							// TODO Auto-generated catch block
+//							e.printStackTrace();
+//						}
+//					}
+//				};
+//				serverListener.setDaemon(true);
+//				serverListener.start();
+//	    	}
+//	   // 	serverListener.start();
+//        }
         
         
+       	final IRobot r = this;
+    	if(r == null) {
+    		System.out.println("this is null???? 1");
+    	}
+		Thread t = new Thread() {
+			@Override
+			public void run() {
+				RobotServer server;
+				try {
+					if(r == null) {
+			    		System.out.println("this is null???? 1");
+			    	}
+					server = new RobotServer(r);
+					server.open();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		};
+		t.setDaemon(true);
+		t.start();
     }
 
     @Override
@@ -750,6 +802,7 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
     public void onPause() {
   //      mView.unregisterListener();
         destroyBTCommunicator();
+        isConnectedToRobo = false;
         super.onStop();
     }
 
@@ -1038,6 +1091,7 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
                     String address = data.getExtras().getString(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
                     pairing = data.getExtras().getBoolean(DeviceListActivity.PAIRING);
                     startBTCommunicator(address);
+                   
                 }
                 
                 break;
@@ -1102,6 +1156,16 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
 //                showToast(R.string.tts_initialization_failure, Toast.LENGTH_LONG);
         }
     }
+
+	@Override
+	public void setEngineSpeed(float x, float y) {
+//		System.out.println("Float x:");
+//		System.out.print(x);
+//		System.out.println("Float y:");
+//		System.out.print(y);
+		updateMotorControlByLap(50, 0, 1, 0);
+		
+	}
 
 
 }

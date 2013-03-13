@@ -1,5 +1,5 @@
 package com.example.test_context;
-
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -21,6 +21,13 @@ public class MainActivity extends Activity {
 			 String value = extras.getString("mush");
 			 setText(value);
 		}
+		
+    	WifiManager wifiManager = (WifiManager) getSystemService(WIFI_SERVICE);
+    	int ipAddress = wifiManager.getConnectionInfo().getIpAddress();
+    	final String formatedIpAddress = String.format("%d.%d.%d.%d", (ipAddress & 0xff), (ipAddress >> 8 & 0xff),
+    	        (ipAddress >> 16 & 0xff), (ipAddress >> 24 & 0xff));
+    	setText(formatedIpAddress + "v2");
+
 	}
 
 	public void doContextChange(View view){
