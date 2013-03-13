@@ -13,7 +13,7 @@ public class RobotServer extends MessageServer {
 	
 	
 	public RobotServer(IRobot robot) throws IOException {
-		super(InetAddress.getByName("0.0.0.0"), 10007);
+		super(InetAddress.getByName("0.0.0.0"), 10009);
 		// TODO Auto-generated constructor stub
 		_robot = robot;
 		if(robot == null) {
