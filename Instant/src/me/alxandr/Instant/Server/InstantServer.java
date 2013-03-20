@@ -82,6 +82,15 @@ public abstract class InstantServer {
 		_listener.start();
 	}
 	
+	public synchronized void close() throws InterruptedException {
+		if(!_running) {
+			throw new IllegalStateException("Not open");
+		}
+		
+		_running = false;
+		_listener.join();
+	}
+	
 	private final void onClientConnected(final Socket socket) throws IOException {
 		final DataInputStream iStream = new DataInputStream(socket.getInputStream());
 		final DataOutputStream oStream = new DataOutputStream(socket.getOutputStream());

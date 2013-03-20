@@ -43,6 +43,7 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Surfac
     private boolean _previewDisplayCreated = false;
     private SurfaceHolder _previewDisplay = null;
     private CameraStreamer _cameraStreamer = null;
+    private RobotServer _server;
     
     private String _ipAddress = "";
     private boolean _useFlashLight = PREF_FLASH_LIGHT_DEF;
@@ -95,6 +96,7 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Surfac
 				try {
 					server = new RobotServer(r);
 					server.open();
+					_server = server;
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -112,6 +114,15 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Surfac
     	super.onPause();
     	
     	_running = false;
+    	if(_server != null) {
+    		try {
+				_server.close();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    		_server = null;
+    	}
     	ensureCameraStreamerStopped();
     }
     

@@ -1,11 +1,13 @@
 package eit.robot.droidbot;
 
 import java.io.IOException;
+import java.util.List;
 
 import android.graphics.ImageFormat;
 import android.graphics.Rect;
 import android.graphics.YuvImage;
 import android.hardware.Camera;
+import android.hardware.Camera.Size;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -21,7 +23,7 @@ import android.view.SurfaceHolder;
     private static final int MESSAGE_TRY_START_STREAMING = 0;
     private static final int MESSAGE_SEND_PREVIEW_FRAME = 1;
 
-    private static final long OPEN_CAMERA_POLL_INTERVAL_MS = 1000L;
+    private static final long OPEN_CAMERA_POLL_INTERVAL_MS = 500L;
     
     private final Object _lock = new Object();
     private final MovingAverage _averageSpf = new MovingAverage(50);
@@ -101,10 +103,6 @@ import android.view.SurfaceHolder;
     
     /* package */ void stop() {
     	synchronized(_lock) {
-    		if(_running) {
-    			throw new IllegalStateException("CameraStreamer is already stopped");
-    		}
-    		
     		_running = false;
     		
     		if(_streamer != null) {
@@ -147,6 +145,15 @@ import android.view.SurfaceHolder;
         if(_useFlashLight) {
         	params.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
         }
+        List<Camera.Size> sizes = params.getSupportedPictureSizes();
+        /*Camera.Size min = null;
+        for(Size s : sizes) {
+        	if(min == null)
+        		min = s;
+        	if(s.height * s.height < min.width * min.height)
+        		min = s;
+        }*/
+        params.setPreviewSize(1280,720);
         
         final int[] range = params.getSupportedPreviewFpsRange().get(0);
         params.setPreviewFpsRange(range[Camera.Parameters.PREVIEW_FPS_MIN_INDEX],
