@@ -15,7 +15,9 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.ParcelFileDescriptor;
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.view.Menu;
 import android.view.Surface;
 import android.view.SurfaceHolder;
@@ -27,15 +29,29 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
 
-public class MainActivity extends Activity implements BotHandler, IRobot, Callback {
+public class MainActivity extends Activity implements BotHandler, IRobot, SurfaceHolder.Callback {
+	private static final String TAG = MainActivity.class.getSimpleName();
+
+    private static final String PREF_FLASH_LIGHT = "flash_light";
+    private static final boolean PREF_FLASH_LIGHT_DEF = false;
+    private static final String PREF_PORT = "port";
+    private static final int PREF_PORT_DEF = 8080;
+    private static final String PREF_JPEG_QUALITY = "jpeg_quality";
+    private static final int PREF_JPEG_QUALITY_DEF = 40;
+    
+    private boolean _running = false;
+    private boolean _previewDisplayCreated = false;
+    private SurfaceHolder _previewDisplay = null;
+    private CameraStreamer _cameraStreamer = null;
+    
+    private String _ipAddress = "";
+    private boolean _useFlashLight = PREF_FLASH_LIGHT_DEF;
+    private int _port = PREF_PORT_DEF;
+    private int _quality = PREF_JPEG_QUALITY_DEF;
+    
 	private TextView _txt;
 	private TextView _txt2;
-	private MediaRecorder _mediaRecorder;
 	private SurfaceView _surface;
-	private SurfaceHolder _holder;
-	private Camera _camera;
-	private boolean _running;
-	private boolean _init;
 	
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,110 +64,24 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Callba
         
         setContentView(R.layout.activity_main);
         
-        
-        
         _txt = (TextView)findViewById(R.id.bolle);
     	_txt2 = (TextView)findViewById(R.id.bug);
     	_surface = (SurfaceView)findViewById(R.id.mediaController1);
-    	_holder = _surface.getHolder();
-    	_holder.addCallback(this);
-    	
-    	Button b = (Button)findViewById(R.id.button1);
-    	b.setOnClickListener(new View.OnClickListener() {
-    		@Override
-    		public void onClick(View v) {
-    			if(!_running) {
-    				_mediaRecorder.start();
-    				_running = true;
-    			} else {
-    				_mediaRecorder.stop();
-    				_mediaRecorder.reset();
-    				try {
-    					initRecorder(_holder.getSurface());
-    				} catch(IOException e) {
-    					e.printStackTrace();
-    				}
-    				_running = false;
-    			}
-    		}
-    	});
-    }
-    
-    private void initRecorder(Surface surface) throws IOException {
-    	if(_camera == null) {
-    		_camera = Camera.open();
-    		_camera.unlock();
-    	}
-    	
-    	if(_mediaRecorder == null)
-    		_mediaRecorder = new MediaRecorder();
-    	
-    	_mediaRecorder.setPreviewDisplay(surface);
-    	_mediaRecorder.setCamera(_camera);
-    	
-    	_mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
-    	_mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-    	
-    	File file = new File(Environment.getExternalStorageDirectory() + "/EiT.avi");
-    	if(file.exists())
-    		file.delete();
-    	
-    	DatagramSocket socket = new DatagramSocket(10008);
-    	socket.setBroadcast(true);
-    	
-    	_mediaRecorder.setOutputFile(ParcelFileDescriptor.fromDatagramSocket(socket).getFileDescriptor());
-    	
-    	_mediaRecorder.setMaxDuration(0);
-    	_mediaRecorder.setCaptureRate(15);
-    	
-    	_mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-    	
-    	try {
-    		_mediaRecorder.prepare();
-    	} catch(IllegalStateException e) {
-    		e.printStackTrace();
-    	}
-    	
-    	_init = true;
-    }
-    
-    private void shutdown() {
-    	if(_mediaRecorder != null) {
-	    	_mediaRecorder.reset();
-	    	_mediaRecorder.release();
-    	}
-    	if(_camera != null) {
-    		_camera.release();
-    	}
-    	
-    	_mediaRecorder = null;
-    	_camera = null;
-    }
-
-    //BOO
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.activity_main, menu);
-        return true; 
+    	_previewDisplay = _surface.getHolder();
+    	_previewDisplay.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+    	_previewDisplay.addCallback(this);
     }
     
     @Override
     protected void onResume() {
     	super.onResume();
     	
+    	_running = true;
+    	
     	getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     	
     	WifiManager wifiManager = (WifiManager) getSystemService(WIFI_SERVICE);
     	int ipAddress = wifiManager.getConnectionInfo().getIpAddress();
-    	
-    	
-    	
-    	
-    	_holder = _surface.getHolder();
-    	_holder.addCallback(this);
-    	
-    	
     	
     	final String formatedIpAddress = String.format("%d.%d.%d.%d", (ipAddress & 0xff), (ipAddress >> 8 & 0xff),
     	        (ipAddress >> 16 & 0xff), (ipAddress >> 24 & 0xff));
@@ -174,24 +104,61 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Callba
 		t.setDaemon(true);
 		t.start();
 		
-		
-		
-		helloLog("Testing this log thing xD");
+		tryStartCameraStreamer();
     }
     
     @Override
     protected void onPause() {
     	super.onPause();
     	
-    	// TODO: Stop server
-    	shutdown();
+    	_running = false;
+    	ensureCameraStreamerStopped();
     }
-
-	@Override
-	public void setText(String text) {
-		// TODO Auto-generated method stub
-		_txt2.setText(text);
-	}
+    
+    @Override
+    public void surfaceChanged(final SurfaceHolder holder, final int format, final int width,
+            final int height)
+    {
+        // Ingored
+    } // surfaceChanged(SurfaceHolder, int, int, int)
+    
+    @Override
+    public void surfaceCreated(final SurfaceHolder holder)
+    {
+        _previewDisplayCreated = true;
+        tryStartCameraStreamer();
+    } // surfaceCreated(SurfaceHolder)
+    
+    @Override
+    public void surfaceDestroyed(final SurfaceHolder holder)
+    {
+        _previewDisplayCreated = false;
+        ensureCameraStreamerStopped();
+    } // surfaceDestroyed(SurfaceHolder)
+    
+    private void tryStartCameraStreamer()
+    {
+        if (_running && _previewDisplayCreated)
+        {
+            _cameraStreamer = new CameraStreamer(_useFlashLight && hasFlashLight(), _port, _quality,
+                    _previewDisplay);
+            _cameraStreamer.start();
+        } // if
+    } // tryStartCameraStreamer()
+    
+    private void ensureCameraStreamerStopped()
+    {
+        if (_cameraStreamer != null)
+        {
+            _cameraStreamer.stop();
+            _cameraStreamer = null;
+        } // if
+    } // stopCameraStreamer()
+    
+    private boolean hasFlashLight()
+    {
+        return getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH);
+    } // hasFlashLight()
 
 	@Override
 	public void setEngineSpeed(final float x, final float y) {
@@ -204,33 +171,16 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Callba
 			}
 		});
 	}
-	
-	static {
-	    System.loadLibrary("ndk1");
-	}
-	private native void helloLog(String logThis);
 
 	@Override
-	public void surfaceChanged(SurfaceHolder arg0, int arg1, int arg2, int arg3) {
+	public void setText(final String text) {
 		// TODO Auto-generated method stub
-		
+		runOnUiThread(new Runnable() {
+			@Override
+			public void run() {
+				_txt2.setText(text);
+			}
+		});
 	}
-
-	@Override
-	public void surfaceDestroyed(SurfaceHolder arg0) {
-		// TODO Auto-generated method stub
-		shutdown();
-	}
-	
-    @Override
-    public void surfaceCreated(SurfaceHolder holder) {
-    	try {
-    		if(!_init) {
-    			initRecorder(_holder.getSurface());
-    		}
-    	} catch(IOException e) {
-    		e.printStackTrace();
-    	}
-    }
     
 }
