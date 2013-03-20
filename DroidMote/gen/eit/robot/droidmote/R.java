@@ -25,12 +25,15 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
         public static final int ic_launcher=0x7f020000;
     }
     public static final class id {
+        public static final int TextViewX=0x7f08000b;
+        public static final int TextViewY=0x7f08000c;
         public static final int btnBottom=0x7f080004;
         public static final int btnLeft=0x7f080002;
         public static final int btnOpp=0x7f080001;
         public static final int btnRight=0x7f080003;
         public static final int fullscreen_content=0x7f080000;
         public static final int ip=0x7f080008;
+        public static final int joystickView=0x7f08000a;
         public static final int login_form=0x7f080007;
         public static final int login_status=0x7f080005;
         public static final int login_status_message=0x7f080006;
@@ -39,6 +42,7 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
     public static final class layout {
         public static final int activity_fullscreen=0x7f030000;
         public static final int activity_login=0x7f030001;
+        public static final int joystick=0x7f030002;
     }
     public static final class menu {
         public static final int activity_login=0x7f070000;

@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
+import eit.robot.mjpeg.MjpegInputStream;
+import eit.robot.mjpeg.MjpegView;
+
 import me.alxandr.Transport.RobotClient;
 
 import android.annotation.TargetApi;
@@ -13,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.Editable;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
@@ -30,7 +34,9 @@ public class FullscreenActivity extends Activity {
 	private RobotClient _client;
 	private Button _btnUp, _btnLeft, _btnDown, _btnRight;
 	float x, y;
-	
+	private MjpegView mv;
+	private String URL = "http://yayayayayayyayy.no";
+
 	private void doFinish() {
 		runOnUiThread(new Runnable() {
 			@Override
@@ -50,32 +56,54 @@ public class FullscreenActivity extends Activity {
 		
 		Intent i = getIntent();
 		final String ip = i.getExtras().getString("ip");
-		Thread t = new Thread() {
-			@Override
-			public void run() {
-				try {
-					_client = new RobotClient(InetAddress.getByName(ip));
-					_client.connect();
-					_client.setEngines(0, 0);
-				} catch (UnknownHostException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-					
-					doFinish();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-					doFinish();
-				}
-			}
-		};
-		t.setDaemon(true);
-		t.start();
+//		Thread t = new Thread() {
+//			@Override
+//			public void run() {
+//				try {
+//					_client = new RobotClient(InetAddress.getByName(ip));
+//					_client.connect();
+//					_client.setEngines(0, 0);
+//				} catch (UnknownHostException e) {
+//					// TODO Auto-generated catch block
+//					e.printStackTrace();
+//					
+//					doFinish();
+//				} catch (IOException e) {
+//					// TODO Auto-generated catch block
+//					e.printStackTrace();
+//					doFinish();
+//				}
+//			}
+//		};
+//		t.setDaemon(true);
+//		t.start();
 		
 
-		setContentView(R.layout.activity_fullscreen);
+//		setContentView(R.layout.activity_fullscreen);
 
-		final View contentView = findViewById(R.id.fullscreen_content);
+//		final View contentView = findViewById(R.id.fullscreen_content);
+        mv = new MjpegView(this);
+        setContentView(mv);        
+        
+        Thread t = new Thread() {
+        	@Override
+        	public void run() {
+        		final MjpegInputStream stream = MjpegInputStream.read(ip);
+        		runOnUiThread(new Runnable() {
+        			@Override
+        			public void run() 
+        			{
+        				Log.d("DroidMote", "Nettverk done!");
+        				mv.setSource(stream);
+        				mv.setDisplayMode(MjpegView.SIZE_BEST_FIT);
+        		        mv.showFps(true);
+        			}
+        		});
+        	}
+        };
+        t.start();
+        
+
 	}
 	
 	public void addLeft(View v) {
@@ -99,19 +127,19 @@ public class FullscreenActivity extends Activity {
 	}
 	
 	private void updateValues() {
-		Thread t = new Thread() {
-			@Override
-			public void run() {
-				try {
-					_client.setEngines(x, y);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-			}
-		};
-		t.setDaemon(true);
-		t.start();
+//		Thread t = new Thread() {
+//			@Override
+//			public void run() {
+//				try {
+//					_client.setEngines(x, y);
+//				} catch (IOException e) {
+//					// TODO Auto-generated catch block
+//					e.printStackTrace();
+//				}
+//			}
+//		};
+//		t.setDaemon(true);
+//		t.start();
 	}
 	
 	@Override

@@ -34,12 +34,12 @@
 		<link>
 			<name>instant-src</name>
 			<type>2</type>
-			<location>/Users/alxandr/EiT/Instant/src</location>
+			<location>C:/Users/lap/workspace/Instant/src</location>
 		</link>
 		<link>
 			<name>transport-src</name>
 			<type>2</type>
-			<location>/Users/alxandr/EiT/Transport/src</location>
+			<location>C:/Users/lap/workspace/Transport/src</location>
 		</link>
 	</linkedResources>
 </projectDescription>

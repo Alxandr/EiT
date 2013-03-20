@@ -195,6 +195,7 @@ public class LoginActivity extends Activity {
 
 			if (success) {
 				Intent newIntent = new Intent(LoginActivity.this, FullscreenActivity.class);
+	//			Intent newIntent = new Intent(LoginActivity.this, JoystickActivity.class);
 				newIntent.putExtra("ip", _ip);
 				LoginActivity.this.startActivity(newIntent);
 			} else {
