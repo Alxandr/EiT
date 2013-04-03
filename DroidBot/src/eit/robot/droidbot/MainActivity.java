@@ -8,15 +8,18 @@ import java.net.SocketException;
 import me.alxandr.Transport.IRobot;
 import me.alxandr.Transport.RobotServer;
 
-
-
 import android.hardware.Camera;
 import android.media.MediaRecorder;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Message;
 import android.os.ParcelFileDescriptor;
 import android.app.Activity;
+import android.app.ProgressDialog;
+import android.bluetooth.BluetoothAdapter;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
@@ -30,16 +33,20 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
-public class MainActivity extends Activity implements BotHandler, IRobot, SurfaceHolder.Callback {
+public class MainActivity extends Activity implements BotHandler, IRobot, SurfaceHolder.Callback, BTConnectable {
 	private static final String TAG = MainActivity.class.getSimpleName();
 
     private static final String PREF_FLASH_LIGHT = "flash_light";
-    private static final boolean PREF_FLASH_LIGHT_DEF = false;
+    private static final boolean PREF_FLASH_LIGHT_DEF = true;
     private static final String PREF_PORT = "port";
     private static final int PREF_PORT_DEF = 8080;
     private static final String PREF_JPEG_QUALITY = "jpeg_quality";
     private static final int PREF_JPEG_QUALITY_DEF = 40;
+    
+    private static final int REQUEST_CONNECT_DEVICE = 1;
+    private static final int REQUEST_ENABLE_BT = 2;
     
     private boolean _running = false;
     private boolean _previewDisplayCreated = false;
@@ -56,6 +63,14 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Surfac
 	private TextView _txt2;
 	private SurfaceView _surface;
 	
+	private BTCommunicator _btComm;
+	private Handler _btcHandler;
+	private boolean _findingNxt = false;
+	private boolean _pairing;
+
+	private ProgressDialog _proggresModal;
+	private int _position;
+	
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -63,7 +78,6 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Surfac
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         
         setContentView(R.layout.activity_main);
         
@@ -76,6 +90,22 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Surfac
     }
     
     @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+    	switch(requestCode) {
+    	case REQUEST_CONNECT_DEVICE:
+    		// When DeviceListActivity returns with a device to connect
+            if (resultCode == Activity.RESULT_OK) {
+                // Get the device MAC address and start a new bt communicator thread
+            	_pairing = data.getExtras().getBoolean(DeviceListActivity.PAIRING);
+                String address = data.getExtras().getString(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
+                startBTCommunicator(address);
+            }
+            //_findingNxt = false;
+            break;
+    	}
+    }
+
+	@Override
     protected void onResume() {
     	super.onResume();
     	
@@ -106,9 +136,27 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Surfac
 			}
 		};
 		t.setDaemon(true);
-		t.start();
+		if(_btComm != null)
+			t.start();
 		
-		tryStartCameraStreamer();
+		try {
+			tryStartCameraStreamer();
+			tryConnectToMindstorm();
+		} catch(Exception e)
+		{
+			_running = false;
+	    	if(_server != null) {
+	    		try {
+					_server.close();
+				} catch (InterruptedException e2) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+	    		_server = null;
+	    	}
+	    	ensureCameraStreamerStopped();
+	    	finish();
+		}
     }
     
     @Override
@@ -126,6 +174,25 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Surfac
     		_server = null;
     	}
     	ensureCameraStreamerStopped();
+    	destroyBTCommunicator();
+    }
+    
+    @Override
+    protected void onDestroy() {
+    	super.onDestroy();
+    	
+    	_running = false;
+    	if(_server != null) {
+    		try {
+				_server.close();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    		_server = null;
+    	}
+    	ensureCameraStreamerStopped();
+    	destroyBTCommunicator();
     }
     
     @Override
@@ -159,7 +226,62 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Surfac
         } // if
     } // tryStartCameraStreamer()
     
-    private void ensureCameraStreamerStopped()
+    private void tryConnectToMindstorm()
+    {
+    	if(_btComm != null) return;
+    	
+    	if(BluetoothAdapter.getDefaultAdapter() == null) {
+    		Toast.makeText(this, "No bluetooth", Toast.LENGTH_LONG).show();
+    		destroyBTCommunicator();
+    		throw new IllegalStateException();
+    	}
+    	
+    	if(!BluetoothAdapter.getDefaultAdapter().isEnabled()) {
+    		Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+    		startActivityForResult(enableIntent, REQUEST_ENABLE_BT);
+    	} else {
+    		selectNXT();
+    	}
+    } // tryConnectToMindstorm()
+    
+    private void startBTCommunicator(String address) {
+    	_proggresModal = ProgressDialog.show(this, "", getResources().getString(R.string.connecting_please_wait), true);
+
+        if (_btComm != null) {
+            try {
+            	_btComm.destroyNXTconnection();
+            }
+            catch (IOException e) { }
+        }
+        _btComm = new BTCommunicator(this, _mindstormHandler, BluetoothAdapter.getDefaultAdapter(), getResources());
+        _btcHandler = _btComm.getHandler();
+        _btComm.setMACAddress(address);
+        _btComm.start();
+	}
+    
+    private synchronized void destroyBTCommunicator() {
+		// TODO Auto-generated method stub
+		if(_btComm != null) {
+			sendBTCmessage(BTCommunicator.NO_DELAY, BTCommunicator.DISCONNECT, 0, 0);
+			_btComm = null;
+		}
+	}
+
+	private void sendBTCmessage(int delay, int message, int value1, int value2) {
+		Bundle myBundle = new Bundle();
+        myBundle.putInt("message", message);
+        myBundle.putInt("value1", value1);
+        myBundle.putInt("value2", value2);
+        Message myMessage = _mindstormHandler.obtainMessage();
+        myMessage.setData(myBundle);
+        if (delay == 0)
+            _btcHandler.sendMessage(myMessage);
+
+        else
+            _btcHandler.sendMessageDelayed(myMessage, delay);
+	}
+
+	private void ensureCameraStreamerStopped()
     {
         if (_cameraStreamer != null)
         {
@@ -196,4 +318,71 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Surfac
 		});
 	}
     
+	synchronized void selectNXT() {
+		if(_findingNxt) return;
+		_findingNxt = true;
+        Intent serverIntent = new Intent(this, DeviceListActivity.class);
+        startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
+    }
+	
+	final Handler _mindstormHandler = new Handler() {
+		@Override
+		public void handleMessage(Message msg) {
+			switch (msg.getData().getInt("message")) {
+			case BTCommunicator.DISPLAY_TOAST:
+				Toast.makeText(MainActivity.this, msg.getData().getString("toastText"), Toast.LENGTH_SHORT).show();
+				break;
+				
+			case BTCommunicator.STATE_CONNECTED:
+				_proggresModal.dismiss();
+				break;
+				
+			case BTCommunicator.MOTOR_STATE:
+				if(_btComm != null) {
+					byte[] motorMessage = _btComm.getReturnMessage();
+                    _position = byteToInt(motorMessage[21]) + (byteToInt(motorMessage[22]) << 8) + (byteToInt(motorMessage[23]) << 16)
+                                   + (byteToInt(motorMessage[24]) << 24);
+				}
+				break;
+				
+			case BTCommunicator.STATE_CONNECTERROR_PAIRING:
+			case BTCommunicator.STATE_CONNECTERROR:
+				_proggresModal.dismiss();
+				Toast.makeText(MainActivity.this, "Error connecting", Toast.LENGTH_LONG).show();
+				new Thread() {
+					@Override
+					public void run() {
+						try {
+							Thread.sleep(2000);
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
+								finish();
+							}
+						});
+					}
+				}.start();
+				break;
+			}
+		}
+	};
+	
+	private int byteToInt(byte byteValue) {
+        int intValue = (byteValue & (byte) 0x7f);
+
+        if ((byteValue & (byte) 0x80) != 0)
+            intValue |= 0x80;
+
+        return intValue;
+    }
+
+	@Override
+	public boolean isPairing() {
+		// TODO Auto-generated method stub
+		return _pairing;
+	}
 }

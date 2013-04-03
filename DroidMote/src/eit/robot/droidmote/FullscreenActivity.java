@@ -42,7 +42,6 @@ public class FullscreenActivity extends Activity {
 	
 	private MjpegView mv;
 	private String URL = "http://yayayayayayyayy.no";
-	JoystickFragment joystickFragment;
 
 	private void doFinish() {
 		runOnUiThread(new Runnable() {
