@@ -3,7 +3,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#0099cc"
-    tools:context=".FullscreenActivity" >
+    tools:context=".FullscreenActivity"
+    android:id="@+id/main_layout" >
 
     <!--
          The primary full-screen view. This can be replaced with whatever view
@@ -11,6 +12,7 @@
          TextureView, etc.
     -->
 
+	<!-- 
     <TextView
         android:id="@+id/fullscreen_content"
         android:layout_width="match_parent"
@@ -22,11 +24,12 @@
         android:textSize="50sp"
         android:textStyle="bold" />
 
+	-->
     <!--
          This FrameLayout insets its children based on system windows using
          android:fitsSystemWindows.
     -->
-
+	<!--  
     <Button
         android:id="@+id/btnOpp"
         android:layout_width="wrap_content"
@@ -66,5 +69,32 @@
         android:layout_marginTop="36dp"
         android:text="Bottom"
         android:onClick="addBottom" />
+-->
 
+    <eit.robot.joystick.JoystickView
+        android:id="@+id/joystickView"
+        android:layout_width="100dip"
+        android:layout_height="100dip"
+        android:layout_marginBottom="20dip"
+        android:layout_marginRight="10dip" 
+        android:alpha="0.5"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"/>
+
+	<TableLayout android:layout_width="wrap_content"
+		android:layout_height="wrap_content" android:layout_gravity="center_horizontal"
+		android:layout_marginTop="10dip">
+		<TableRow>
+			<TextView android:text="X" android:layout_width="50dip"
+				android:layout_height="wrap_content"></TextView>
+			<TextView android:text="" android:id="@+id/TextViewX"
+				android:layout_width="100dip" android:layout_height="wrap_content"></TextView>
+		</TableRow>
+		<TableRow>
+			<TextView android:text="Y" android:layout_width="wrap_content"
+				android:layout_height="wrap_content"></TextView>
+			<TextView android:text="" android:id="@+id/TextViewY"
+				android:layout_width="wrap_content" android:layout_height="wrap_content"></TextView>
+		</TableRow>
+	</TableLayout>
 </RelativeLayout>

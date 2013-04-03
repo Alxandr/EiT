@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
+import eit.robot.joystick.JoystickView;
 import eit.robot.mjpeg.MjpegInputStream;
 import eit.robot.mjpeg.MjpegView;
 
@@ -11,6 +12,8 @@ import me.alxandr.Transport.RobotClient;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.app.FragmentManager;
+import android.app.FragmentTransaction;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
@@ -23,6 +26,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.RelativeLayout;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -34,8 +38,11 @@ public class FullscreenActivity extends Activity {
 	private RobotClient _client;
 	private Button _btnUp, _btnLeft, _btnDown, _btnRight;
 	float x, y;
+	private JoystickView joystick;
+	
 	private MjpegView mv;
 	private String URL = "http://yayayayayayyayy.no";
+	JoystickFragment joystickFragment;
 
 	private void doFinish() {
 		runOnUiThread(new Runnable() {
@@ -79,11 +86,18 @@ public class FullscreenActivity extends Activity {
 //		t.start();
 		
 
-//		setContentView(R.layout.activity_fullscreen);
-
-//		final View contentView = findViewById(R.id.fullscreen_content);
+		setContentView(R.layout.activity_fullscreen);
+		RelativeLayout main = (RelativeLayout) findViewById(R.id.main_layout);
         mv = new MjpegView(this);
-        setContentView(mv);        
+        main.addView(mv,0);
+      //  setContentView(mv);
+
+ //        addContentView(joystick, null);
+        
+//        final MjpegInputStream stream = MjpegInputStream.read(ip);
+//		mv.setSource(stream);
+//		mv.setDisplayMode(MjpegView.SIZE_BEST_FIT);
+//        mv.showFps(true);
         
         Thread t = new Thread() {
         	@Override
@@ -103,6 +117,12 @@ public class FullscreenActivity extends Activity {
         };
         t.start();
         
+//        FragmentManager fragmentManager = getFragmentManager();
+//        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+//        
+//        joystickFragment = new JoystickFragment();
+//    	fragmentTransaction.add(R.layout.joystick, joystickFragment);
+//    	fragmentTransaction.commit();
 
 	}
 	
