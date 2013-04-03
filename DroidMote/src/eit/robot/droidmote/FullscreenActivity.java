@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
+import eit.robot.joystick.JoystickMovedListener;
 import eit.robot.joystick.JoystickView;
 import eit.robot.mjpeg.MjpegInputStream;
 import eit.robot.mjpeg.MjpegView;
@@ -27,6 +28,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.RelativeLayout;
+import android.widget.TextView;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -37,8 +39,9 @@ import android.widget.RelativeLayout;
 public class FullscreenActivity extends Activity {
 	private RobotClient _client;
 	private Button _btnUp, _btnLeft, _btnDown, _btnRight;
-	float x, y;
+	private float x, y;
 	private JoystickView joystick;
+	private TextView txtX, txtY;
 	
 	private MjpegView mv;
 	private String URL = "http://yayayayayayyayy.no";
@@ -63,33 +66,38 @@ public class FullscreenActivity extends Activity {
 		
 		Intent i = getIntent();
 		final String ip = i.getExtras().getString("ip");
-//		Thread t = new Thread() {
-//			@Override
-//			public void run() {
-//				try {
-//					_client = new RobotClient(InetAddress.getByName(ip));
-//					_client.connect();
-//					_client.setEngines(0, 0);
-//				} catch (UnknownHostException e) {
-//					// TODO Auto-generated catch block
-//					e.printStackTrace();
-//					
-//					doFinish();
-//				} catch (IOException e) {
-//					// TODO Auto-generated catch block
-//					e.printStackTrace();
-//					doFinish();
-//				}
-//			}
-//		};
-//		t.setDaemon(true);
-//		t.start();
+		Thread t = new Thread() {
+			@Override
+			public void run() {
+				try {
+					_client = new RobotClient(InetAddress.getByName(ip));
+					_client.connect();
+					_client.setEngines(0, 0);
+				} catch (UnknownHostException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+					
+					doFinish();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+					doFinish();
+				}
+			}
+		};
+		t.setDaemon(true);
+		t.start();
 		
 
 		setContentView(R.layout.activity_fullscreen);
 		RelativeLayout main = (RelativeLayout) findViewById(R.id.main_layout);
         mv = new MjpegView(this);
         main.addView(mv,0);
+		txtX = (TextView)findViewById(R.id.TextViewX);
+        txtY = (TextView)findViewById(R.id.TextViewY);
+        joystick = (JoystickView)findViewById(R.id.joystickView);
+        
+        joystick.setOnJostickMovedListener(_listener);
       //  setContentView(mv);
 
  //        addContentView(joystick, null);
@@ -99,7 +107,7 @@ public class FullscreenActivity extends Activity {
 //		mv.setDisplayMode(MjpegView.SIZE_BEST_FIT);
 //        mv.showFps(true);
         
-        Thread t = new Thread() {
+        Thread cam = new Thread() {
         	@Override
         	public void run() {
         		final MjpegInputStream stream = MjpegInputStream.read(ip);
@@ -115,7 +123,7 @@ public class FullscreenActivity extends Activity {
         		});
         	}
         };
-        t.start();
+        cam.start();
         
 //        FragmentManager fragmentManager = getFragmentManager();
 //        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
@@ -147,19 +155,19 @@ public class FullscreenActivity extends Activity {
 	}
 	
 	private void updateValues() {
-//		Thread t = new Thread() {
-//			@Override
-//			public void run() {
-//				try {
-//					_client.setEngines(x, y);
-//				} catch (IOException e) {
-//					// TODO Auto-generated catch block
-//					e.printStackTrace();
-//				}
-//			}
-//		};
-//		t.setDaemon(true);
-//		t.start();
+		Thread t = new Thread() {
+			@Override
+			public void run() {
+				try {
+					_client.setEngines(x, y);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		};
+		t.setDaemon(true);
+		t.start();
 	}
 	
 	@Override
@@ -167,4 +175,26 @@ public class FullscreenActivity extends Activity {
 		super.onResume();
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 	}
+	
+    private JoystickMovedListener _listener = new JoystickMovedListener() {
+
+		@Override
+		public void OnMoved(int pan, int tilt) {
+			tilt = tilt *-1; // y is reversed, this unreverse it
+			txtX.setText(Integer.toString(pan));
+			txtY.setText(Integer.toString(tilt));
+			x = pan;
+			y = tilt;
+			updateValues();
+		}
+
+		@Override
+		public void OnReleased() {
+			txtX.setText("stopped");
+			txtY.setText("stopped");
+			x = 0;
+			y = 0;
+			updateValues();
+		}
+	}; 
 }

@@ -102,7 +102,7 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
     private boolean isCurrentlyTurning = false;
     private int desiredAngle = 0;
     private Timer turnAllowedTimer;
-    private int swingAngleMax = 80;
+    private int swingAngleMax = 60;
     private int swingAngleMedium = 50;
     private int swingAngleLow = 30;
     private Thread serverListener;
@@ -246,6 +246,7 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
         createBTCommunicator();
         myBTCommunicator.setMACAddress(mac_address);
         myBTCommunicator.start();
+        makeStateValid();
         updateButtonsAndMenu();
         isConnectedToRobo = true;
     }
@@ -459,6 +460,7 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
         }
     }
  */   
+    /*
     public void updateMotorControlByLap(int up, int down,int left, int right) {
 
     	int diff = 0;
@@ -541,6 +543,8 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
         System.out.print("left");
         System.out.println(left);
     }
+    
+    */
     /*
     public void doTurnrate(int left, int right){
     	if(isCurrentlyTurning == false){
@@ -932,6 +936,7 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
                         int position = byteToInt(motorMessage[21]) + (byteToInt(motorMessage[22]) << 8) + (byteToInt(motorMessage[23]) << 16)
                                        + (byteToInt(motorMessage[24]) << 24);
                        lapTestPositionInt = position;    
+                       makeStateValid();
               //         isCurrentlyTurning = false;
                         showToast(getResources().getString(R.string.current_position) + position, Toast.LENGTH_SHORT);
                     }
@@ -1159,13 +1164,68 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
 
 	@Override
 	public void setEngineSpeed(float x, float y) {
-//		System.out.println("Float x:");
-//		System.out.print(x);
-//		System.out.println("Float y:");
-//		System.out.print(y);
-		updateMotorControlByLap(50, 0, 1, 0);
+		int nX, nY;
+		nX = (int) (x); //turnangle is increased by 15 per x;
+		nY = (int) (y);//speed is increased by 20% per y
+	
+//		System.out.println("rX:");
+//		System.out.print(nX);	
+//		System.out.println("rY:");
+//		System.out.print(nY);
+		Log.d("nx", Integer.toString(nX));
+		Log.d("ny", Integer.toString(nY));
 		
+		updateMotorControlByLap(nX,nY);
 	}
 
-
+	int lastX = 0;
+	int wantedDegrees = 0;
+	int yspeed = 0;
+    public void updateMotorControlByLap(int x, int y) {
+    	
+    	wantedDegrees = x * 15;
+    	yspeed = y * (-20);
+            
+    	
+        
+        
+    }
+    
+    void makeStateValid() {
+    	new Thread() {
+    		@Override
+    		public void run() {
+    			try {
+    				while(!connected) {
+    					Thread.sleep(500);
+    				}
+					Thread.sleep(250);
+					if(connected && Math.abs(lapTestPositionInt) < 200) {
+						// roter
+						int diff = lapTestPositionInt - wantedDegrees;
+						Log.d("gradoffset", "Gradoffset: " + diff);
+						Log.d("gradoffset", "Grader: " + lapTestPositionInt);
+						if(Math.abs(diff) > 10) {
+							int spd;
+							if(diff < 0)
+								spd = 1;
+							else
+								spd = -1;
+							
+							sendBTCmessage(BTCommunicator.NO_DELAY, 999,32*spd, 5);
+							sendBTCmessage(BTCommunicator.NO_DELAY, motorRight, yspeed, 0);
+						}
+						Thread.sleep(10);
+						sendBTCmessage(BTCommunicator.NO_DELAY, 60, 0, 0);
+					} else if(connected) {
+						sendBTCmessage(BTCommunicator.NO_DELAY, 60, 0, 0);
+					}
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+    			
+    		}
+    	}.start();
+    }
 }
