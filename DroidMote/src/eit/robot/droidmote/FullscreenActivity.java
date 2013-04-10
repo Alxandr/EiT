@@ -133,32 +133,20 @@ public class FullscreenActivity extends Activity {
 
 	}
 	
-	public void addLeft(View v) {
-		x -= 0.05f;
-		updateValues();
-	}
 	
-	public void addRight(View v) {
-		x += 0.05f;
-		updateValues();
-	}
-	
-	public void addUpp(View v) {
-		y += 0.05f;
-		updateValues();
-	}
-	
-	public void addBottom(View v) {
-		y -= 0.05f;
-		updateValues();
-	}
-	
+	float oldX = -10f, oldY = -10f;
 	private void updateValues() {
 		Thread t = new Thread() {
 			@Override
 			public void run() {
 				try {
-					_client.setEngines(x, y);
+					synchronized(this) {
+						if(oldX != x || oldY != y || (x == 0 && y == 0)) {
+							_client.setEngines(x, y);
+							oldX = x;
+							oldY = y;
+						}
+					}
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
