@@ -146,18 +146,21 @@ import android.view.SurfaceHolder;
         	params.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
         }
         List<Camera.Size> sizes = params.getSupportedPictureSizes();
-        /*Camera.Size min = null;
+        Camera.Size min = null;
         for(Size s : sizes) {
         	if(min == null)
         		min = s;
         	if(s.height * s.height < min.width * min.height)
         		min = s;
-        }*/
-        params.setPreviewSize(1280,720);
-        
-        final int[] range = params.getSupportedPreviewFpsRange().get(0);
+        }
+        params.setPreviewSize(min.width, min.height);
+    //    params.setPreviewSize(480,320);
+        List <int[]> test = params.getSupportedPreviewFpsRange();
+        final int[] range = test.get(test.size() - 1);
+   
+  
         params.setPreviewFpsRange(range[Camera.Parameters.PREVIEW_FPS_MIN_INDEX],
-                range[Camera.Parameters.PREVIEW_FPS_MAX_INDEX]);
+               range[Camera.Parameters.PREVIEW_FPS_MAX_INDEX]);
         camera.setParameters(params);
         
         _previewFormat = params.getPreviewFormat();

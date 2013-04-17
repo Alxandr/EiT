@@ -23,6 +23,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.util.Log;
 import android.view.Menu;
 import android.view.Surface;
 import android.view.SurfaceHolder;
@@ -295,16 +296,44 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Surfac
         return getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH);
     } // hasFlashLight()
 
+    
+    int sentB = 0, sentC = 0;
+    int wantB = 0, wantC = 0;
 	@Override
 	public void setEngineSpeed(final float x, final float y) {
 		// TODO Auto-generated method stub
-		runOnUiThread(new Runnable() {
-			@Override
-			public void run() {
-				String str = "x: " + x + ", y: " + y;
-				_txt.setText(str);
+		// math
+		Log.d("engine", "x: " + x + ", y: " + y);
+		synchronized(this) {
+			if(y == 0) {
+				wantB = wantC = 0;
+			} else {
+				int base = (int)(y * 20);
+				int diff = (int)((-x / 5) * (Math.abs(base)/2));
+				if(diff > 0) {
+					wantB = base;
+					wantC = (Math.abs(base) / base) * (Math.abs(base) - Math.abs(diff));
+				} else if(diff < 0) {
+					wantB = (Math.abs(base) / base) * (Math.abs(base) - Math.abs(diff));
+					wantC = base;
+				} else {
+					wantB = base;
+					wantC = base;
+				}
 			}
-		});
+			
+			if(wantB != sentB || wantC != sentC) {
+				if(wantB != sentB) {
+					sendBTCmessage(BTCommunicator.NO_DELAY, BTCommunicator.MOTOR_B, wantB, 0);
+					sentB = wantB;
+				}
+				
+				if(wantC != sentC) {
+					sendBTCmessage(BTCommunicator.NO_DELAY, BTCommunicator.MOTOR_C, wantC, 0);
+					sentC = wantC;
+				}
+			}
+		}
 	}
 
 	@Override
@@ -385,4 +414,5 @@ public class MainActivity extends Activity implements BotHandler, IRobot, Surfac
 		// TODO Auto-generated method stub
 		return _pairing;
 	}
+	
 }

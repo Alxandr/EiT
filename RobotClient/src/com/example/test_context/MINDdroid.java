@@ -45,6 +45,7 @@ import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
 
+
 import me.alxandr.Transport.IRobot;
 import me.alxandr.Transport.RobotServer;
 
@@ -1161,21 +1162,38 @@ public class MINDdroid extends Activity implements BTConnectable, TextToSpeech.O
 //                showToast(R.string.tts_initialization_failure, Toast.LENGTH_LONG);
         }
     }
-
+    int sentB = 0, sentC = 0;
+    int wantB = 0, wantC = 0;
 	@Override
 	public void setEngineSpeed(float x, float y) {
-		int nX, nY;
-		nX = (int) (x); //turnangle is increased by 15 per x;
-		nY = (int) (y);//speed is increased by 20% per y
-	
-//		System.out.println("rX:");
-//		System.out.print(nX);	
-//		System.out.println("rY:");
-//		System.out.print(nY);
-		Log.d("nx", Integer.toString(nX));
-		Log.d("ny", Integer.toString(nY));
+		if(y == 0) {
+			wantB = wantC = 0;
+		} else {
+			int base = (int)(y * 20);
+			int diff = (int)((-x / 5) * (Math.abs(base)/2));
+			if(diff > 0) {
+				wantB = base;
+				wantC = (Math.abs(base) / base) * (Math.abs(base) - Math.abs(diff));
+			} else if(diff < 0) {
+				wantB = (Math.abs(base) / base) * (Math.abs(base) - Math.abs(diff));
+				wantC = base;
+			} else {
+				wantB = base;
+				wantC = base;
+			}
+		}
 		
-		updateMotorControlByLap(nX,nY);
+		if(wantB != sentB || wantC != sentC) {
+			if(wantB != sentB) {
+				sendBTCmessage(BTCommunicator.NO_DELAY, BTCommunicator.MOTOR_B, wantB, 0);
+				sentB = wantB;
+			}
+			
+			if(wantC != sentC) {
+				sendBTCmessage(BTCommunicator.NO_DELAY, BTCommunicator.MOTOR_C, wantC, 0);
+				sentC = wantC;
+			}
+		}
 	}
 
 	int lastX = 0;
